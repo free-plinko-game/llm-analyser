@@ -1,9 +1,10 @@
 import time
 import logging
+import os
 from datetime import datetime
 from typing import Optional, List, Dict
 from flask import current_app
-from openai import OpenAI
+import openai
 
 from app import db
 from app.models import Query, Citation, JobRun, JobStatus
@@ -20,41 +21,38 @@ class ChatGPTRunner:
         if not self.api_key:
             raise ValueError("OpenAI API key not configured")
 
-        self.client = OpenAI(api_key=self.api_key)
+        # Set API key for openai module
+        openai.api_key = self.api_key
         self.rate_limit_delay = current_app.config.get('RATE_LIMIT_DELAY_SECONDS', 6)
 
     def run_query(self, query: Query) -> List[Dict]:
         """
-        Run a single query against ChatGPT with web search enabled.
+        Run a single query against ChatGPT.
 
         Returns list of citation dicts extracted from the response.
         """
         try:
-            # Use the responses API with web_search tool
-            response = self.client.responses.create(
+            # Create a prompt that encourages citation of sources
+            system_prompt = """You are a helpful research assistant. When answering questions,
+            always cite your sources with full URLs. Include relevant Australian websites and
+            authoritative sources. Format citations as full URLs (https://...) in your response."""
+
+            # Use chat completions API (widely supported)
+            response = openai.chat.completions.create(
                 model="gpt-4o",
-                tools=[{"type": "web_search"}],
-                input=query.query_text
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query.query_text}
+                ],
+                temperature=0.7,
+                max_tokens=2000
             )
 
-            citations = []
+            # Extract text from response
+            response_text = response.choices[0].message.content
 
-            # Extract citations from response
-            for output in response.output:
-                if output.type == "message":
-                    for content in output.content:
-                        if hasattr(content, 'annotations') and content.annotations:
-                            # Use structured annotations from web search
-                            citations.extend(
-                                CitationParser.parse_web_search_annotations(
-                                    [a.__dict__ for a in content.annotations]
-                                )
-                            )
-                        elif hasattr(content, 'text'):
-                            # Fallback to text parsing
-                            citations.extend(
-                                CitationParser.parse_response(content.text)
-                            )
+            # Parse citations from the response text
+            citations = CitationParser.parse_response(response_text)
 
             return citations
 
@@ -85,9 +83,9 @@ class ChatGPTRunner:
         try:
             # Get queries to process
             if query_ids:
-                queries = Query.query.filter(Query.id.in_(query_ids)).all()
+                queries = db.session.query(Query).filter(Query.id.in_(query_ids)).all()
             else:
-                queries = Query.query.filter_by(is_active=True).all()
+                queries = db.session.query(Query).filter_by(is_active=True).all()
 
             for query in queries:
                 try:
