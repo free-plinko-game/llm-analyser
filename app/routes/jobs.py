@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, render_template, flash, redirect, url_for
 
 from app import db
-from app.models import JobRun, JobStatus, Query
+from app.models import JobRun, JobStatus, Query, IntentType
 from app.services.chatgpt_runner import ChatGPTRunner
 
 jobs_bp = Blueprint('jobs', __name__)
@@ -81,10 +81,68 @@ def run_job():
     return redirect(url_for('jobs.list_jobs'))
 
 
+@jobs_bp.route('/jobs/run/intent/<intent_type>', methods=['POST'])
+def run_job_by_intent(intent_type):
+    """Run collection job for queries of a specific intent type."""
+    try:
+        intent = IntentType(intent_type)
+    except ValueError:
+        flash(f'Invalid intent type: {intent_type}', 'error')
+        return redirect(url_for('jobs.list_jobs'))
+
+    # Get query IDs for this intent type
+    queries = db.session.query(Query).filter_by(
+        intent_type=intent,
+        is_active=True
+    ).all()
+    query_ids = [q.id for q in queries]
+
+    if not query_ids:
+        flash(f'No active queries found for intent: {intent_type}', 'warning')
+        return redirect(url_for('jobs.list_jobs'))
+
+    try:
+        runner = ChatGPTRunner()
+        job = runner.run_collection_job(query_ids=query_ids)
+
+        flash(f'Job completed: {job.citations_found} citations from {job.queries_processed} {intent_type} queries', 'success')
+
+    except Exception as e:
+        flash(f'Job failed: {str(e)}', 'error')
+
+    return redirect(url_for('jobs.list_jobs'))
+
+
+@jobs_bp.route('/jobs/run/category/<category>', methods=['POST'])
+def run_job_by_category(category):
+    """Run collection job for queries of a specific category."""
+    # Get query IDs for this category
+    queries = db.session.query(Query).filter_by(
+        category=category,
+        is_active=True
+    ).all()
+    query_ids = [q.id for q in queries]
+
+    if not query_ids:
+        flash(f'No active queries found for category: {category}', 'warning')
+        return redirect(url_for('jobs.list_jobs'))
+
+    try:
+        runner = ChatGPTRunner()
+        job = runner.run_collection_job(query_ids=query_ids)
+
+        flash(f'Job completed: {job.citations_found} citations from {job.queries_processed} queries in {category}', 'success')
+
+    except Exception as e:
+        flash(f'Job failed: {str(e)}', 'error')
+
+    return redirect(url_for('jobs.list_jobs'))
+
+
 @jobs_bp.route('/jobs/run/<int:query_id>', methods=['POST'])
 def run_single_query_job(query_id):
     """Run collection job for a single query."""
-    query = Query.query.get_or_404(query_id)
+    query = db.session.query(Query).get_or_404(query_id)
 
     try:
         runner = ChatGPTRunner()

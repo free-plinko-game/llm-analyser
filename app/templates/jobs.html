@@ -6,8 +6,27 @@
 <div class="flex-between mb-20">
     <h1>Collection Jobs</h1>
     <form action="{{ url_for('jobs.run_job') }}" method="POST">
-        <button type="submit" class="btn btn-primary">Run New Job</button>
+        <button type="submit" class="btn btn-primary">Run All Queries</button>
     </form>
+</div>
+
+<div class="card mb-20">
+    <h2>Run by Intent Type</h2>
+    <p class="text-muted mb-20">Run jobs for specific query types to avoid rate limits</p>
+    <div class="flex">
+        <form action="{{ url_for('jobs.run_job_by_intent', intent_type='informational') }}" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-sm badge-info" style="border: none; cursor: pointer; padding: 8px 16px;">Informational</button>
+        </form>
+        <form action="{{ url_for('jobs.run_job_by_intent', intent_type='navigational') }}" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-sm badge-success" style="border: none; cursor: pointer; padding: 8px 16px;">Navigational</button>
+        </form>
+        <form action="{{ url_for('jobs.run_job_by_intent', intent_type='transactional') }}" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-sm badge-warning" style="border: none; cursor: pointer; padding: 8px 16px;">Transactional</button>
+        </form>
+        <form action="{{ url_for('jobs.run_job_by_intent', intent_type='commercial') }}" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-sm badge-commercial" style="border: none; cursor: pointer; padding: 8px 16px;">Commercial</button>
+        </form>
+    </div>
 </div>
 
 <div class="card">
