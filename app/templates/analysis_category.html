@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Domains by Category - Citation Intelligence{% endblock %}
+
+{% block content %}
+<h1 class="mb-20">Domains by Business Category</h1>
+
+{% for category, domains in data.items() %}
+<div class="card">
+    <h2>{{ category|title }}</h2>
+    {% if domains %}
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Domain</th>
+                <th>Citations</th>
+                <th>Share</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for domain in domains %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><a href="{{ url_for('analysis.domain_detail', domain=domain.domain) }}">{{ domain.domain }}</a></td>
+                <td>{{ domain.count }}</td>
+                <td>{{ domain.percentage }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No data for this category.</p>
+    {% endif %}
+</div>
+{% endfor %}
+
+{% if not data %}
+<div class="card">
+    <p class="text-muted">No categories with citation data yet.</p>
+</div>
+{% endif %}
+{% endblock %}

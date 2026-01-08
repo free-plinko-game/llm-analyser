@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis - Citation Intelligence{% endblock %}
+
+{% block content %}
+<h1 class="mb-20">Citation Analysis</h1>
+
+<div class="stats-grid">
+    <a href="{{ url_for('analysis.top_domains') }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="number">Top</div>
+        <div class="label">Domains Report</div>
+    </a>
+    <a href="{{ url_for('analysis.domains_by_intent') }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="number">By</div>
+        <div class="label">Intent Analysis</div>
+    </a>
+    <a href="{{ url_for('analysis.domains_by_category') }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="number">By</div>
+        <div class="label">Category Analysis</div>
+    </a>
+    <a href="{{ url_for('analysis.citation_trends') }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="number">Time</div>
+        <div class="label">Trend Analysis</div>
+    </a>
+</div>
+
+<div class="card">
+    <h2>Export Data</h2>
+    <p class="mb-20">Download the complete citation dataset for external analysis.</p>
+    <div class="flex">
+        <a href="{{ url_for('analysis.export_data', format='csv') }}" class="btn btn-primary">Export CSV</a>
+        <a href="{{ url_for('analysis.export_data', format='json') }}" class="btn btn-secondary">Export JSON</a>
+    </div>
+</div>
+{% endblock %}

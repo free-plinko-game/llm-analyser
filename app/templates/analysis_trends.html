@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Citation Trends - Citation Intelligence{% endblock %}
+
+{% block content %}
+<h1 class="mb-20">Citation Trends{% if domain %} - {{ domain }}{% endif %}</h1>
+
+<div class="card">
+    <form method="GET" class="flex mb-20">
+        <div class="form-group" style="margin-bottom: 0; flex: 1;">
+            <input type="text" name="domain" placeholder="Filter by domain" value="{{ request.args.get('domain', '') }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0; width: 120px;">
+            <select name="days">
+                <option value="7" {% if request.args.get('days', '30') == '7' %}selected{% endif %}>7 days</option>
+                <option value="30" {% if request.args.get('days', '30') == '30' %}selected{% endif %}>30 days</option>
+                <option value="60" {% if request.args.get('days') == '60' %}selected{% endif %}>60 days</option>
+                <option value="90" {% if request.args.get('days') == '90' %}selected{% endif %}>90 days</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Apply</button>
+    </form>
+
+    {% if trends %}
+    <div style="height: 300px; display: flex; align-items: flex-end; gap: 2px; padding: 20px 0;">
+        {% set max_count = trends|map(attribute='count')|max %}
+        {% for point in trends %}
+        <div style="flex: 1; background: #4ecca3; height: {{ (point.count / max_count * 100) if max_count > 0 else 0 }}%; min-height: 2px; position: relative;" title="{{ point.date }}: {{ point.count }} citations">
+        </div>
+        {% endfor %}
+    </div>
+    <div class="flex-between text-muted">
+        <span>{{ trends[0].date if trends else '' }}</span>
+        <span>{{ trends[-1].date if trends else '' }}</span>
+    </div>
+
+    <table style="margin-top: 30px;">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Citations</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for point in trends|reverse %}
+            <tr>
+                <td>{{ point.date }}</td>
+                <td>{{ point.count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No trend data available for the selected period.</p>
+    {% endif %}
+</div>
+{% endblock %}

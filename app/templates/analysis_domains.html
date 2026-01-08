@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Top Domains - Citation Intelligence{% endblock %}
+
+{% block content %}
+<h1 class="mb-20">Top Cited Domains</h1>
+
+<div class="card">
+    <form method="GET" class="flex mb-20">
+        <div class="form-group" style="margin-bottom: 0; flex: 1;">
+            <select name="intent">
+                <option value="">All Intents</option>
+                {% for intent in intent_types %}
+                <option value="{{ intent }}" {% if request.args.get('intent') == intent %}selected{% endif %}>{{ intent|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0; width: 100px;">
+            <input type="number" name="days" placeholder="Days" value="{{ request.args.get('days', '') }}">
+        </div>
+        <div class="form-group" style="margin-bottom: 0; width: 100px;">
+            <input type="number" name="limit" placeholder="Limit" value="{{ request.args.get('limit', 20) }}">
+        </div>
+        <button type="submit" class="btn btn-secondary">Filter</button>
+    </form>
+
+    {% if domains %}
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Domain</th>
+                <th>Citations</th>
+                <th>Share</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for domain in domains %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><strong>{{ domain.domain }}</strong></td>
+                <td>{{ domain.count }}</td>
+                <td>
+                    <div class="flex">
+                        <div class="progress-bar" style="width: 150px;">
+                            <div class="fill" style="width: {{ domain.percentage }}%;"></div>
+                        </div>
+                        <span>{{ domain.percentage }}%</span>
+                    </div>
+                </td>
+                <td class="text-right">
+                    <a href="{{ url_for('analysis.domain_detail', domain=domain.domain) }}" class="btn btn-sm btn-secondary">Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No citation data available.</p>
+    {% endif %}
+</div>
+{% endblock %}

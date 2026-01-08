@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Summary - Citation Intelligence{% endblock %}
+
+{% block content %}
+<h1 class="mb-20">Summary Statistics</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="number">{{ stats.total_citations or 0 }}</div>
+        <div class="label">Total Citations</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ stats.unique_domains or 0 }}</div>
+        <div class="label">Unique Domains</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ stats.active_queries or 0 }}</div>
+        <div class="label">Active Queries</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ stats.total_jobs or 0 }}</div>
+        <div class="label">Total Jobs</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ stats.completed_jobs or 0 }}</div>
+        <div class="label">Completed Jobs</div>
+    </div>
+</div>
+
+{% if stats.latest_job %}
+<div class="card">
+    <h2>Latest Job</h2>
+    <p><strong>ID:</strong> #{{ stats.latest_job.id }}</p>
+    <p><strong>Status:</strong> {{ stats.latest_job.status }}</p>
+    <p><strong>Started:</strong> {{ stats.latest_job.started_at }}</p>
+    <p><strong>Queries Processed:</strong> {{ stats.latest_job.queries_processed }}</p>
+    <p><strong>Citations Found:</strong> {{ stats.latest_job.citations_found }}</p>
+</div>
+{% endif %}
+{% endblock %}

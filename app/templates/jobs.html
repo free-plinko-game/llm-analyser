@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Jobs - Citation Intelligence{% endblock %}
+
+{% block content %}
+<div class="flex-between mb-20">
+    <h1>Collection Jobs</h1>
+    <form action="{{ url_for('jobs.run_job') }}" method="POST">
+        <button type="submit" class="btn btn-primary">Run New Job</button>
+    </form>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Queries</th>
+                <th>Citations</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs.items %}
+            <tr>
+                <td>#{{ job.id }}</td>
+                <td>{{ job.started_at.strftime('%Y-%m-%d %H:%M') if job.started_at else '-' }}</td>
+                <td>
+                    {% if job.completed_at and job.started_at %}
+                    {{ ((job.completed_at - job.started_at).total_seconds() / 60)|round(1) }} min
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if job.status.value == 'completed' %}
+                    <span class="badge badge-success">Completed</span>
+                    {% elif job.status.value == 'running' %}
+                    <span class="badge badge-info">Running</span>
+                    {% elif job.status.value == 'failed' %}
+                    <span class="badge badge-danger">Failed</span>
+                    {% else %}
+                    <span class="badge badge-warning">{{ job.status.value|title }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ job.queries_processed }}</td>
+                <td>{{ job.citations_found }}</td>
+                <td>
+                    <div class="flex">
+                        <a href="{{ url_for('jobs.get_job', job_id=job.id) }}" class="btn btn-sm btn-secondary">View</a>
+                        {% if job.status.value == 'failed' %}
+                        <form action="{{ url_for('jobs.retry_job', job_id=job.id) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">Retry</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-muted text-center">No jobs run yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if jobs.pages > 1 %}
+    <div class="flex" style="margin-top: 20px; justify-content: center;">
+        {% if jobs.has_prev %}
+        <a href="?page={{ jobs.prev_num }}" class="btn btn-sm btn-secondary">&laquo; Previous</a>
+        {% endif %}
+        <span>Page {{ jobs.page }} of {{ jobs.pages }}</span>
+        {% if jobs.has_next %}
+        <a href="?page={{ jobs.next_num }}" class="btn btn-sm btn-secondary">Next &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}{{ domain }} - Citation Intelligence{% endblock %}
+
+{% block content %}
+<div class="flex-between mb-20">
+    <h1>{{ domain }}</h1>
+    <a href="{{ url_for('analysis.top_domains') }}" class="btn btn-secondary">&larr; Back to Domains</a>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="number">{{ position_stats.total_citations or 0 }}</div>
+        <div class="label">Total Citations</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ position_stats.avg_position or '-' }}</div>
+        <div class="label">Avg Position</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ position_stats.distribution.get('first', 0) }}</div>
+        <div class="label">First Position</div>
+    </div>
+    <div class="stat-card">
+        <div class="number">{{ position_stats.distribution.get('top_3', 0) }}</div>
+        <div class="label">Top 3 Positions</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Page Types</h2>
+    {% if page_types %}
+    <table>
+        <thead>
+            <tr>
+                <th>Page Type</th>
+                <th>Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pt in page_types %}
+            <tr>
+                <td>{{ pt.page_type|title }}</td>
+                <td>{{ pt.count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No page type data available.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Citation Trend (Last 90 Days)</h2>
+    {% if trends %}
+    <div style="height: 200px; display: flex; align-items: flex-end; gap: 2px; padding: 20px 0;">
+        {% set max_count = trends|map(attribute='count')|max %}
+        {% for point in trends %}
+        <div style="flex: 1; background: #4ecca3; height: {{ (point.count / max_count * 100) if max_count > 0 else 0 }}%; min-height: 2px;" title="{{ point.date }}: {{ point.count }}"></div>
+        {% endfor %}
+    </div>
+    <div class="flex-between text-muted">
+        <span>{{ trends[0].date if trends else '' }}</span>
+        <span>{{ trends[-1].date if trends else '' }}</span>
+    </div>
+    {% else %}
+    <p class="text-muted">No trend data available.</p>
+    {% endif %}
+</div>
+{% endblock %}

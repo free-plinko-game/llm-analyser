@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Job #{{ job.id }} - Citation Intelligence{% endblock %}
+
+{% block content %}
+<div class="flex-between mb-20">
+    <h1>Job #{{ job.id }}</h1>
+    <a href="{{ url_for('jobs.list_jobs') }}" class="btn btn-secondary">&larr; Back to Jobs</a>
+</div>
+
+<div class="card">
+    <h2>Job Details</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+        <div>
+            <strong>Status:</strong><br>
+            {% if job.status.value == 'completed' %}
+            <span class="badge badge-success">Completed</span>
+            {% elif job.status.value == 'running' %}
+            <span class="badge badge-info">Running</span>
+            {% elif job.status.value == 'failed' %}
+            <span class="badge badge-danger">Failed</span>
+            {% else %}
+            <span class="badge badge-warning">{{ job.status.value|title }}</span>
+            {% endif %}
+        </div>
+        <div>
+            <strong>Started:</strong><br>
+            {{ job.started_at.strftime('%Y-%m-%d %H:%M:%S') if job.started_at else '-' }}
+        </div>
+        <div>
+            <strong>Completed:</strong><br>
+            {{ job.completed_at.strftime('%Y-%m-%d %H:%M:%S') if job.completed_at else '-' }}
+        </div>
+        <div>
+            <strong>Duration:</strong><br>
+            {% if job.completed_at and job.started_at %}
+            {{ ((job.completed_at - job.started_at).total_seconds() / 60)|round(1) }} minutes
+            {% else %}
+            -
+            {% endif %}
+        </div>
+        <div>
+            <strong>Queries Processed:</strong><br>
+            {{ job.queries_processed }}
+        </div>
+        <div>
+            <strong>Citations Found:</strong><br>
+            {{ job.citations_found }}
+        </div>
+    </div>
+
+    {% if job.error_log %}
+    <div style="margin-top: 20px; padding: 15px; background: #f8d7da; border-radius: 5px;">
+        <strong>Errors:</strong>
+        <pre style="margin-top: 10px; white-space: pre-wrap;">{{ job.error_log }}</pre>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Citations Collected ({{ citations|length }})</h2>
+    {% if citations %}
+    <table>
+        <thead>
+            <tr>
+                <th>Position</th>
+                <th>Domain</th>
+                <th>URL</th>
+                <th>Page Type</th>
+                <th>Query</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for citation in citations %}
+            <tr>
+                <td>{{ citation.position }}</td>
+                <td><a href="{{ url_for('analysis.domain_detail', domain=citation.domain) }}">{{ citation.domain }}</a></td>
+                <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <a href="{{ citation.url }}" target="_blank" title="{{ citation.url }}">{{ citation.url }}</a>
+                </td>
+                <td>{{ citation.page_type or '-' }}</td>
+                <td>{{ citation.query.query_text[:50] }}{% if citation.query.query_text|length > 50 %}...{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">No citations collected in this job.</p>
+    {% endif %}
+</div>
+{% endblock %}

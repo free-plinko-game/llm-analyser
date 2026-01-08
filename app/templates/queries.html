@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Queries - Citation Intelligence{% endblock %}
+
+{% block content %}
+<div class="flex-between mb-20">
+    <h1>Query Bank</h1>
+    <div class="flex">
+        <button onclick="document.getElementById('addQueryModal').style.display='block'" class="btn btn-primary">Add Query</button>
+        <button onclick="document.getElementById('bulkUploadModal').style.display='block'" class="btn btn-secondary">Bulk Upload</button>
+    </div>
+</div>
+
+<div class="card">
+    <form method="GET" class="flex mb-20">
+        <div class="form-group" style="margin-bottom: 0; flex: 1;">
+            <select name="intent">
+                <option value="">All Intents</option>
+                {% for intent in intent_types %}
+                <option value="{{ intent }}" {% if request.args.get('intent') == intent %}selected{% endif %}>{{ intent|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0; flex: 1;">
+            <select name="category">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if request.args.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Filter</button>
+    </form>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Query</th>
+                <th>Intent</th>
+                <th>Category</th>
+                <th>Citations</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for query in queries %}
+            <tr>
+                <td>{{ query.query_text }}</td>
+                <td>
+                    {% if query.intent_type.value == 'informational' %}
+                    <span class="badge badge-info">Informational</span>
+                    {% elif query.intent_type.value == 'navigational' %}
+                    <span class="badge badge-success">Navigational</span>
+                    {% elif query.intent_type.value == 'transactional' %}
+                    <span class="badge badge-warning">Transactional</span>
+                    {% elif query.intent_type.value == 'commercial' %}
+                    <span class="badge badge-commercial">Commercial</span>
+                    {% endif %}
+                </td>
+                <td>{{ query.category }}</td>
+                <td>{{ query.citations.count() }}</td>
+                <td>
+                    {% if query.is_active %}
+                    <span class="badge badge-success">Active</span>
+                    {% else %}
+                    <span class="badge badge-secondary" style="background: #6c757d; color: #fff;">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex">
+                        <form action="{{ url_for('jobs.run_single_query_job', query_id=query.id) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-primary">Run</button>
+                        </form>
+                        <form action="{{ url_for('queries.toggle_query', query_id=query.id) }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-secondary">{{ 'Deactivate' if query.is_active else 'Activate' }}</button>
+                        </form>
+                        <form action="{{ url_for('queries.delete_query', query_id=query.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this query?')">
+                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-muted text-center">No queries found. Add some to get started.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Query Modal -->
+<div id="addQueryModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="background: #fff; max-width: 500px; margin: 100px auto; border-radius: 8px; padding: 30px;">
+        <div class="flex-between mb-20">
+            <h2>Add New Query</h2>
+            <button onclick="document.getElementById('addQueryModal').style.display='none'" style="background: none; border: none; font-size: 1.5em; cursor: pointer;">&times;</button>
+        </div>
+        <form action="{{ url_for('queries.create_query') }}" method="POST">
+            <div class="form-group">
+                <label>Query Text</label>
+                <textarea name="query_text" rows="3" required placeholder="e.g., best betting apps australia 2025"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Intent Type</label>
+                <select name="intent_type" required>
+                    <option value="">Select intent...</option>
+                    {% for intent in intent_types %}
+                    <option value="{{ intent }}">{{ intent|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <input type="text" name="category" required placeholder="e.g., sports betting, casino, poker">
+            </div>
+            <button type="submit" class="btn btn-primary">Add Query</button>
+        </form>
+    </div>
+</div>
+
+<!-- Bulk Upload Modal -->
+<div id="bulkUploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="background: #fff; max-width: 500px; margin: 100px auto; border-radius: 8px; padding: 30px;">
+        <div class="flex-between mb-20">
+            <h2>Bulk Upload Queries</h2>
+            <button onclick="document.getElementById('bulkUploadModal').style.display='none'" style="background: none; border: none; font-size: 1.5em; cursor: pointer;">&times;</button>
+        </div>
+        <form action="{{ url_for('queries.bulk_upload') }}" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>CSV File</label>
+                <input type="file" name="file" accept=".csv" required>
+            </div>
+            <p class="text-muted" style="margin-bottom: 15px;">
+                CSV should have columns: query_text, intent_type, category, is_active (optional)
+            </p>
+            <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
