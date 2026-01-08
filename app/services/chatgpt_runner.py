@@ -1,9 +1,9 @@
 import time
 import logging
+import requests
 from datetime import datetime
 from typing import Optional, List, Dict
 from flask import current_app
-from openai import OpenAI
 
 from app import db
 from app.models import Query, Citation, JobRun, JobStatus
@@ -15,12 +15,13 @@ logger = logging.getLogger(__name__)
 class ChatGPTRunner:
     """Runs queries against ChatGPT API with web search and extracts citations."""
 
+    RESPONSES_API_URL = "https://api.openai.com/v1/responses"
+
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or current_app.config.get('OPENAI_API_KEY')
         if not self.api_key:
             raise ValueError("OpenAI API key not configured")
 
-        self.client = OpenAI(api_key=self.api_key)
         self.rate_limit_delay = current_app.config.get('RATE_LIMIT_DELAY_SECONDS', 6)
 
     def run_query(self, query: Query) -> List[Dict]:
@@ -30,24 +31,39 @@ class ChatGPTRunner:
         Returns list of citation dicts extracted from the response.
         """
         try:
-            # Use the Responses API with web_search tool for real citations
-            response = self.client.responses.create(
-                model="gpt-4o",
-                tools=[{"type": "web_search"}],
-                input=query.query_text
-            )
+            # Use raw HTTP request to Responses API with web_search tool
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
 
+            payload = {
+                "model": "gpt-4o",
+                "tools": [{"type": "web_search"}],
+                "input": query.query_text
+            }
+
+            response = requests.post(
+                self.RESPONSES_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=120
+            )
+            response.raise_for_status()
+
+            data = response.json()
             citations = []
 
-            # Extract citations from response
-            for output in response.output:
-                if output.type == "message":
-                    for content in output.content:
-                        if hasattr(content, 'annotations') and content.annotations:
-                            # Use structured annotations from web search
-                            for pos, annotation in enumerate(content.annotations, start=1):
-                                if hasattr(annotation, 'url') and annotation.url:
-                                    url = annotation.url
+            # Extract citations from response output
+            for output in data.get('output', []):
+                if output.get('type') == 'message':
+                    for content in output.get('content', []):
+                        # Check for annotations (citations from web search)
+                        annotations = content.get('annotations', [])
+                        if annotations:
+                            for pos, annotation in enumerate(annotations, start=1):
+                                url = annotation.get('url')
+                                if url:
                                     domain = CitationParser.extract_domain(url)
                                     if domain:
                                         citations.append({
@@ -55,16 +71,19 @@ class ChatGPTRunner:
                                             'domain': domain,
                                             'page_type': CitationParser.classify_page_type(url),
                                             'position': pos,
-                                            'snippet': getattr(annotation, 'title', '') or ''
+                                            'snippet': annotation.get('title', '')
                                         })
-                        elif hasattr(content, 'text') and content.text:
-                            # Fallback to text parsing if no annotations
+                        # Fallback to text parsing if no annotations
+                        elif content.get('text'):
                             citations.extend(
-                                CitationParser.parse_response(content.text)
+                                CitationParser.parse_response(content['text'])
                             )
 
             return citations
 
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error running query {query.id}: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Error running query {query.id}: {str(e)}")
             raise
