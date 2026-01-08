@@ -60,7 +60,7 @@
 
 <div class="card">
     <h2>Citations ({{ query.citations.count() }})</h2>
-    {% set citations = query.citations.order_by('-created_at').limit(50).all() %}
+    {% set citations = query.citations.limit(50).all() %}
     {% if citations %}
     <table>
         <thead>
