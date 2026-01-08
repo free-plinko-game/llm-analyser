@@ -1,10 +1,10 @@
 import time
 import logging
 import os
+import requests
 from datetime import datetime
 from typing import Optional, List, Dict
 from flask import current_app
-import openai
 
 from app import db
 from app.models import Query, Citation, JobRun, JobStatus
@@ -16,13 +16,13 @@ logger = logging.getLogger(__name__)
 class ChatGPTRunner:
     """Runs queries against ChatGPT API with web search and extracts citations."""
 
+    OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or current_app.config.get('OPENAI_API_KEY')
         if not self.api_key:
             raise ValueError("OpenAI API key not configured")
 
-        # Set API key for openai module
-        openai.api_key = self.api_key
         self.rate_limit_delay = current_app.config.get('RATE_LIMIT_DELAY_SECONDS', 6)
 
     def run_query(self, query: Query) -> List[Dict]:
@@ -37,25 +37,41 @@ class ChatGPTRunner:
             always cite your sources with full URLs. Include relevant Australian websites and
             authoritative sources. Format citations as full URLs (https://...) in your response."""
 
-            # Use chat completions API (widely supported)
-            response = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[
+            # Use requests directly to avoid openai library version issues
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": "gpt-4o",
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": query.query_text}
                 ],
-                temperature=0.7,
-                max_tokens=2000
-            )
+                "temperature": 0.7,
+                "max_tokens": 2000
+            }
 
-            # Extract text from response
-            response_text = response.choices[0].message.content
+            response = requests.post(
+                self.OPENAI_API_URL,
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            response_text = data["choices"][0]["message"]["content"]
 
             # Parse citations from the response text
             citations = CitationParser.parse_response(response_text)
 
             return citations
 
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error running query {query.id}: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Error running query {query.id}: {str(e)}")
             raise
