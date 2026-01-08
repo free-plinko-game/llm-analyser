@@ -22,71 +22,90 @@ class ChatGPTRunner:
         if not self.api_key:
             raise ValueError("OpenAI API key not configured")
 
-        self.rate_limit_delay = current_app.config.get('RATE_LIMIT_DELAY_SECONDS', 6)
+        self.rate_limit_delay = current_app.config.get('RATE_LIMIT_DELAY_SECONDS', 10)
 
-    def run_query(self, query: Query) -> List[Dict]:
+    def run_query(self, query: Query, max_retries: int = 3) -> List[Dict]:
         """
         Run a single query against ChatGPT with web search enabled.
+        Includes retry logic with exponential backoff for rate limits.
 
         Returns list of citation dicts extracted from the response.
         """
-        try:
-            # Use raw HTTP request to Responses API with web_search tool
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
 
-            payload = {
-                "model": "gpt-4o",
-                "tools": [{"type": "web_search"}],
-                "input": query.query_text
-            }
+        payload = {
+            "model": "gpt-4o",
+            "tools": [{"type": "web_search"}],
+            "input": query.query_text
+        }
 
-            response = requests.post(
-                self.RESPONSES_API_URL,
-                headers=headers,
-                json=payload,
-                timeout=120
-            )
-            response.raise_for_status()
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    self.RESPONSES_API_URL,
+                    headers=headers,
+                    json=payload,
+                    timeout=120
+                )
 
-            data = response.json()
-            citations = []
+                # Handle rate limiting with retry
+                if response.status_code == 429:
+                    retry_after = int(response.headers.get('Retry-After', 60))
+                    wait_time = max(retry_after, (2 ** attempt) * 30)  # At least 30s, exponential backoff
+                    logger.warning(f"Rate limited on query {query.id}, waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
 
-            # Extract citations from response output
-            for output in data.get('output', []):
-                if output.get('type') == 'message':
-                    for content in output.get('content', []):
-                        # Check for annotations (citations from web search)
-                        annotations = content.get('annotations', [])
-                        if annotations:
-                            for pos, annotation in enumerate(annotations, start=1):
-                                url = annotation.get('url')
-                                if url:
-                                    domain = CitationParser.extract_domain(url)
-                                    if domain:
-                                        citations.append({
-                                            'url': url,
-                                            'domain': domain,
-                                            'page_type': CitationParser.classify_page_type(url),
-                                            'position': pos,
-                                            'snippet': annotation.get('title', '')
-                                        })
-                        # Fallback to text parsing if no annotations
-                        elif content.get('text'):
-                            citations.extend(
-                                CitationParser.parse_response(content['text'])
-                            )
+                response.raise_for_status()
 
-            return citations
+                data = response.json()
+                citations = []
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error running query {query.id}: {str(e)}")
-            raise
-        except Exception as e:
-            logger.error(f"Error running query {query.id}: {str(e)}")
-            raise
+                # Extract citations from response output
+                for output in data.get('output', []):
+                    if output.get('type') == 'message':
+                        for content in output.get('content', []):
+                            # Check for annotations (citations from web search)
+                            annotations = content.get('annotations', [])
+                            if annotations:
+                                for pos, annotation in enumerate(annotations, start=1):
+                                    url = annotation.get('url')
+                                    if url:
+                                        domain = CitationParser.extract_domain(url)
+                                        if domain:
+                                            citations.append({
+                                                'url': url,
+                                                'domain': domain,
+                                                'page_type': CitationParser.classify_page_type(url),
+                                                'position': pos,
+                                                'snippet': annotation.get('title', '')
+                                            })
+                            # Fallback to text parsing if no annotations
+                            elif content.get('text'):
+                                citations.extend(
+                                    CitationParser.parse_response(content['text'])
+                                )
+
+                return citations
+
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 10  # 10s, 20s, 40s
+                    logger.warning(f"Request error on query {query.id}, retrying in {wait_time}s: {str(e)}")
+                    time.sleep(wait_time)
+                continue
+            except Exception as e:
+                logger.error(f"Error running query {query.id}: {str(e)}")
+                raise
+
+        # All retries exhausted
+        logger.error(f"All retries exhausted for query {query.id}: {str(last_error)}")
+        raise last_error or Exception("Max retries exceeded")
 
     def run_collection_job(self, query_ids: Optional[List[int]] = None) -> JobRun:
         """
