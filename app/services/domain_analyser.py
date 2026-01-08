@@ -5,7 +5,7 @@ import pandas as pd
 from sqlalchemy import func
 
 from app import db
-from app.models import Citation, Query, JobRun, IntentType
+from app.models import Citation, Query, JobRun, IntentType, JobStatus
 
 
 class DomainAnalyser:
@@ -258,16 +258,16 @@ class DomainAnalyser:
         Returns:
             Dict with overall stats about citations, domains, etc.
         """
-        total_citations = Citation.query.count()
+        total_citations = db.session.query(Citation).count()
         unique_domains = db.session.query(
             func.count(func.distinct(Citation.domain))
         ).scalar()
-        total_queries = Query.query.filter_by(is_active=True).count()
-        total_jobs = JobRun.query.count()
-        completed_jobs = JobRun.query.filter_by(status='completed').count()
+        total_queries = db.session.query(Query).filter_by(is_active=True).count()
+        total_jobs = db.session.query(JobRun).count()
+        completed_jobs = db.session.query(JobRun).filter_by(status=JobStatus.COMPLETED).count()
 
         # Get most recent job
-        latest_job = JobRun.query.order_by(JobRun.started_at.desc()).first()
+        latest_job = db.session.query(JobRun).order_by(JobRun.started_at.desc()).first()
 
         return {
             'total_citations': total_citations,
